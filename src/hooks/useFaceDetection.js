@@ -15,8 +15,8 @@ export const useFaceDetection = () => {
         faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
         faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
         faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+        faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
       ]);
-      console.log("✅ Models loaded");
     } catch (err) {
       console.error("Error loading models:", err);
       setError("Failed to load face detection models");
@@ -43,11 +43,10 @@ export const useFaceDetection = () => {
         new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
       )
       .withFaceLandmarks()
-      .withFaceDescriptors();
+      .withFaceDescriptors()
+      .withFaceExpressions()
 
     setDetections(detections);
-    // 👇 Optional: log only on change
-    // console.log(detections.length ? "✅ Face detected!" : "❌ No face detected");
   }, [isPaused]);
 
   useEffect(() => {

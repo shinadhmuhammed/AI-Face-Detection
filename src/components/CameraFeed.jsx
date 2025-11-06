@@ -16,16 +16,32 @@ export default function CameraFeed({ mode = "recognize" }) {
   const [recognizeFace] = useRecognizeFaceMutation();
   const [registerFace] = useRegisterFaceMutation();
   const [name, setName] = useState("");
+  const [statusMsg, setStatusMsg] = useState(
+    "Align your face with the camera..."
+  );
+  const [isProcessing, setIsProcessing] = useState(false);
   const canvasRef = useRef();
   const isSendingRef = useRef(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (detections.length > 0 && !isSendingRef.current) {
+useEffect(() => {
+  if (detections.length > 0 && !isSendingRef.current && !isProcessing) {
+    setTimeout(() => {
       isSendingRef.current = true;
       captureAndSend();
-    }
-  }, [detections]);
+    }, 300); 
+  }
+}, [detections]);
+
+
+  const getDominantEmotion = () => {
+    if (detections.length === 0 || !detections[0].expressions) return "neutral";
+
+    const expressions = detections[0].expressions;
+    return Object.keys(expressions).reduce((a, b) =>
+      expressions[a] > expressions[b] ? a : b
+    );
+  };
 
   const captureAndSend = async () => {
     if (!videoRef.current) return;
@@ -33,27 +49,53 @@ export default function CameraFeed({ mode = "recognize" }) {
     const ctx = canvas.getContext("2d");
     ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
 
+    setStatusMsg("😊 Face detected! Processing...");
+    setIsProcessing(true);
+
     canvas.toBlob(async (blob) => {
       try {
         if (mode === "register") {
-          if (!name) return alert("Enter a name before registering!");
+          if (!name) {
+            setStatusMsg("⚠️ Please enter your name before registering!");
+            setIsProcessing(false);
+            isSendingRef.current = false;
+            return;
+          }
+
+          setStatusMsg("🧠 Registering your face... please wait");
           const res = await registerFace({ name, imageBlob: blob });
-          alert(res.data?.message);
-          navigate("/home");
+
+          if (res?.data?.success) {
+            setStatusMsg("✅ Face registered successfully!");
+            setTimeout(() => navigate("/home"), 1500);
+          } else {
+            setStatusMsg("⚠️ Couldn’t register face properly. Try again!");
+          }
         } else {
-          const res = await recognizeFace(blob);
+          setStatusMsg("🔍 Recognizing face...");
+          const emotion = getDominantEmotion();
+
+          const formData = new FormData();
+          formData.append("image", blob);
+          formData.append("emotion", emotion);
+
+          const res = await recognizeFace(formData);
+
           if (res?.data?.match && !res.data.match.includes("unknown")) {
             setRecognizedUser(res.data.match);
             setIsPaused(true);
-            navigate("/home");
+            setStatusMsg(`✅ Recognized: ${res.data.match}`);
+            setTimeout(() => navigate("/home"), 1500);
           } else {
-            alert("❌ Face not recognized or not in database.");
+            setStatusMsg("❌ Face not recognized. Try again!");
           }
         }
       } catch (err) {
         console.error("Error:", err);
+        setStatusMsg("❌ Something went wrong. Try again!");
       } finally {
         isSendingRef.current = false;
+        setIsProcessing(false);
       }
     }, "image/jpeg");
   };
@@ -76,7 +118,12 @@ export default function CameraFeed({ mode = "recognize" }) {
             height="480"
             className="rounded-lg shadow-lg"
           />
-          <canvas ref={canvasRef} width="640" height="480" style={{ display: "none" }} />
+          <canvas
+            ref={canvasRef}
+            width="640"
+            height="480"
+            style={{ display: "none" }}
+          />
           {detections.map((d, i) => (
             <FaceBox key={i} box={d.detection.box} />
           ))}
@@ -91,14 +138,18 @@ export default function CameraFeed({ mode = "recognize" }) {
             placeholder="Enter your name"
             className="text-black"
           />
-          <Button onClick={captureAndSend} className="bg-blue-600 hover:bg-blue-700">
-            Save Face
-          </Button>
         </div>
       )}
 
-      {recognizedUser && (
-        <p className="mt-6 text-lg">✅ Recognized: <strong>{recognizedUser}</strong></p>
+      <div className="mt-6 text-lg font-medium text-center">{statusMsg}</div>
+
+      {mode === "register" && !isProcessing && (
+        <Button
+          onClick={captureAndSend}
+          className="mt-4 bg-blue-600 hover:bg-blue-700"
+        >
+          Save Face
+        </Button>
       )}
     </div>
   );

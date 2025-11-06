@@ -2,7 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Register from "./pages/Register";
 import Recognize from "./pages/Recognize";
-import { Home } from "lucide-react";
+import Home from "./pages/Home";
 
 
 export default function App() {
